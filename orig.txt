@@ -1,0 +1,163 @@
+load_file("preload_files_re.hoc")
+cvode.active(0)
+dt=0.1
+access soma
+distance()
+
+tstop=100
+E_loc=0  
+
+objectvar ampa1, ampa2, ampa3, ampa4
+objref stim_glut1, stim_glut2, stim_glut3, stim_glut4
+stim_strong = 0
+
+strdef source_path, target_path
+
+proc step() {	local i
+	fadvance()
+}
+
+proc run() { local j
+	init()
+	while(t<tstop) {		
+	step()}	
+}
+
+/*-------------- Simulation Record ----------------*/
+objref rect, recv
+
+recv=new Vector()
+rect=new Vector()
+
+recv.record(&soma.v(0.5))
+rect.record(&t)
+
+
+/*------------- Output matrix ------------------*/
+objref recmatrix, conmatrix  
+
+n = 90              /*------------ dt ---------------*/
+
+recmatrix = new Matrix()
+colN=0
+recmatrix.resize(1001,n+1)
+
+conmatrix = new Matrix()
+rowN = 0
+conmatrix.resize(n,1)
+
+/*------------- location of inputs -----------------------------*/
+
+st_loc = 0.2
+in_loc = 0.9
+
+/*------- one-side stimuli location -------*/
+opt1_loc = 0.3
+opt2_loc = 0.5
+/*--------------------------------------*/
+
+dur_time = 100
+I_amp = 0.05
+
+stim_glut1 = new IClamp(st_loc)
+stim_glut1.del = 0
+stim_glut1.dur = dur_time
+stim_glut1.amp = I_amp
+
+stim_glut2 = new IClamp(in_loc)
+stim_glut2.del = 0
+stim_glut2.dur = dur_time
+stim_glut2.amp = I_amp
+
+stim_glut3 = new IClamp(st_loc)    
+stim_glut3.del = 0
+stim_glut3.dur = dur_time
+stim_glut3.amp = I_amp
+
+stim_glut4 = new IClamp(in_loc)   
+stim_glut4.del = 120
+stim_glut4.dur = dur_time
+stim_glut4.amp = I_amp
+
+/*----------------------- property of dendrite -----------------------*/
+
+proc main() {
+	dend[E_loc] {
+		ampa1 = new AMPA()
+		ampa1.loc(st_loc)
+		setpointer ampa1.pre, stim_glut1.i
+		ampa1.gmax = stim_strong
+
+		print distance(ampa1.get_loc())
+	
+		ampa2 = new AMPA()
+		ampa2.loc(in_loc)
+		setpointer ampa2.pre, stim_glut2.i
+		ampa2.gmax = stim_strong
+
+		print distance(ampa2.get_loc())
+	}
+
+	denda[E_loc] {
+		ampa3 = new AMPA()
+		ampa3.loc(st_loc)
+		setpointer ampa3.pre, stim_glut3.i
+		ampa3.gmax = stim_strong
+
+		print distance(ampa3.get_loc())
+
+		ampa4 = new AMPA()
+		ampa4.loc(in_loc)
+		setpointer ampa4.pre, stim_glut4.i
+		ampa4.gmax = stim_strong
+
+		print distance(ampa4.get_loc())
+	}
+
+/*-------------- increasing conductanse -----------------*/
+
+	for (i =0;i<n; i=i+1)  {
+	
+	stim_strong = 0.0005+0.0000002*i//0.00275+0.000002*i
+	
+	ampa1.gmax = stim_strong
+	ampa2.gmax = stim_strong
+	ampa3.gmax = stim_strong
+	ampa4.gmax = stim_strong 	
+
+	run()
+
+	print in_loc, ampa2.get_loc(), distance(ampa2.get_loc()), " : ", i, stim_strong
+
+		if(i == 0) {
+			recmatrix.setcol(colN,rect)
+			colN = colN + 1
+		}
+
+	recmatrix.setcol(colN,recv)
+	colN = colN + 1
+	conmatrix.setrow(rowN,stim_strong)
+	rowN = rowN + 1
+
+	}
+	
+}
+
+/*------------------ output to file --------------*/
+
+main()
+
+objref savdata, condata
+
+savdata = new File()
+savdata.wopen("M2_30_paper_default_dend(0)_3_(0.2)(0.9)_(0.2)_1.dat")
+recmatrix.fprint(savdata,"%g \t")
+
+savdata.close()
+
+
+condata = new File()
+condata.wopen("M2_30_paper_default_dend(0)_3_(0.2)(0.9)_(0.2)_1_con.dat")
+conmatrix.fprint(condata,"%g \t")
+
+condata.close()
